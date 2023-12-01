@@ -12,11 +12,11 @@ fun main() {
     check(part1(testInput) == 142)
 
     val input = readInput("Day01")
-    part1(input).print()
+    part1(input).print { "Part 1: $it" }
 
     val testInput2 = readInput("Day01_test_2")
     check(part2(testInput2) == 281)
-    part2(input).print()
+    part2(input).print { "Part 2: $it" }
 }
 
 private val digits = mapOf(
@@ -28,8 +28,7 @@ private val digits = mapOf(
     "six" to "s6x",
     "seven" to "s7n",
     "eight" to "e8t",
-    "nine" to "n9e",
-    "zero" to "z0o"
+    "nine" to "n9e"
 )
 
 fun String.replaceAll(map: Map<String, String>): String {

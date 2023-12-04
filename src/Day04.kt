@@ -10,15 +10,14 @@ data class Card(val id: Int, val winners: List<Int>, val actuals: List<Int>) {
 
 fun main() {
 
-    fun parse(lines: List<String>): List<Card> {
-        return lines.mapIndexed { lineNo, line ->
-            val (winners, actuals) = line.substringAfter(":").split("|")
-                .map { nums -> nums.split(" ").filter { it.isNotBlank() }.map { it.toInt() } }
-            Card(lineNo, winners, actuals)
-        }
+    fun parse(lines: List<String>) = lines.mapIndexed { lineNo, line ->
+        val (winners, actuals) = line.substringAfter(":").split("|")
+            .map { nums -> nums.split(" ").filter { it.isNotBlank() }.map { it.toInt() } }
+        Card(lineNo, winners, actuals)
     }
 
     fun part1(cards: List<Card>) = cards.sumOf { it.points() }
+
     fun part2(cards: List<Card>): Int {
         val numCards = IntArray(cards.size) { 1 }
         cards.forEach { card ->
@@ -26,7 +25,7 @@ fun main() {
                 numCards[it] = numCards[it] + numCards[card.id]
             }
         }
-        return numCards.fold(0) { acc, i -> acc + i }
+        return numCards.reduce(Int::plus)
     }
 
     val testCards = parse(readInput("Day04_test"))
@@ -36,6 +35,5 @@ fun main() {
     val cards = parse(readInput("Day04"))
     part1(cards).print { "Part 1: $it" }
     part2(cards).print { "Part 2: $it" }
-
 
 }

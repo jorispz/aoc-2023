@@ -147,6 +147,7 @@ data class Position(val x: Int, val y: Int) {
     fun adjacentTo(other: Position) = abs(x - other.x) <= 1 && abs(y - other.y) <= 1
     fun notAdjacentTo(other: Position) = !adjacentTo(other)
 
+
     fun closest(a: Position, b: Position): Position {
         val distA = this.distanceTo(a)
         val distB = this.distanceTo(b)
@@ -280,6 +281,12 @@ data class BoundingBox(val topLeft: Position, val bottomRight: Position) {
         }
         println()
     }
+
+    fun contains(pos: Position) =
+        (pos.x in this.topLeft.x..this.bottomRight.x) && (pos.y in this.topLeft.y..this.bottomRight.y)
+
+    fun adjacentTo(pos: Position) =
+        !contains(pos) && (pos.x in (this.topLeft.x - 1)..(this.bottomRight.x + 1)) && (pos.y in (this.topLeft.y - 1)..(this.bottomRight.y + 1))
 }
 
 fun Collection<Position>.boundingBox(): BoundingBox {

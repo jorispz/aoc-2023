@@ -230,7 +230,7 @@ enum class Turn {
 }
 
 enum class Heading {
-    N, S, E, W;
+    N, E, S, W;
 
     companion object {
         fun from(s: String) = when (s.uppercase()) {

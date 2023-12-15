@@ -14,7 +14,7 @@ fun main() {
             val moveVertical = if (it.first.y < it.second.y) (it.first.y..it.second.y) else (it.second.y..it.first.y)
             val emptyRowsCrossed = emptyRows.count { it in moveVertical }
             val emptyColumnsCrossed = emptyColumns.count { it in moveHorizontal }
-            moveHorizontal.last - moveHorizontal.first + (expansion - 1) * emptyColumnsCrossed + moveVertical.last - moveVertical.first + (expansion - 1) * emptyRowsCrossed
+            moveHorizontal.length + (expansion - 1) * emptyColumnsCrossed + moveVertical.length + (expansion - 1) * emptyRowsCrossed
         }
     }
 

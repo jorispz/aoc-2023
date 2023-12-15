@@ -192,6 +192,14 @@ class Map2D<T>(
 
     operator fun get(p: Position) = this[p.x, p.y]
 
+    operator fun set(x: Int, y: Int, value: T) {
+        map[if (wrapY) y.rem(height) else y][if (wrapX) x.rem(width) else x] = value
+    }
+
+    operator fun set(p: Position, value: T) {
+        this[p.x, p.y] = value
+    }
+
     fun row(index: Int) = sequence {
         (0 until width).forEach { yield(get(it, index)) }
     }
@@ -220,6 +228,8 @@ class Map2D<T>(
 
 }
 
+val IntRange.length
+    get() = abs(this.last - this.first)
 
 operator fun Pair<Int, Int>.plus(other: Pair<Int, Int>) = Pair(this.first + other.first, this.second + other.second)
 operator fun Triple<Int, Int, Int>.plus(other: Triple<Int, Int, Int>) =

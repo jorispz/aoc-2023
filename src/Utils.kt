@@ -192,6 +192,8 @@ class Map2D<T>(
 
     operator fun get(p: Position) = this[p.x, p.y]
 
+    fun getOrNull(p: Position) = if (contains(p)) get(p) else null
+
     operator fun set(x: Int, y: Int, value: T) {
         map[if (wrapY) y.rem(height) else y][if (wrapX) x.rem(width) else x] = value
     }

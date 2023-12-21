@@ -1,7 +1,8 @@
 fun main() {
 
     val lines = readInput("Day14")
-    val map = Map2D(lines) { c, p -> c }
+    val map = Map2D(lines) { c, _ -> c }
+
     fun load() = map.find('O').sumOf { map.height - it.y }
 
     fun move(heading: Heading) {
@@ -18,7 +19,7 @@ fun main() {
             }
         }
     }
-    // Manuel inspection: v®alue 104626 at index 181 seen again at 181, 195, 209, 223
+    // Manual inspection: value 104626 at index 181 seen again at 181, 195, 209, 223
     // 181 + 71428558 * 14 + 7 = 1000000000
     // So we need the value at 188
     val seenValues = mutableMapOf<Int, Int>()

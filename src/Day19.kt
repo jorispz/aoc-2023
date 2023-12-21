@@ -10,6 +10,7 @@ data class Part(val x: Int, val m: Int, val a: Int, val s: Int) {
 }
 
 data class PartRange(val x: IntRange, val m: IntRange, val a: IntRange, val s: IntRange) {
+
     operator fun get(c: Char) = when (c) {
         'x' -> x
         'm' -> m
@@ -17,39 +18,40 @@ data class PartRange(val x: IntRange, val m: IntRange, val a: IntRange, val s: I
         's' -> s
         else -> error("Unknown property $c")
     }
-}
 
-sealed class RuleResult {
-    data object Accept : RuleResult()
-    data object Reject : RuleResult()
-    data object Continue : RuleResult()
-    data class Delegate(val workflow: String) : RuleResult()
+    fun split(property: Char, value: Int): Pair<PartRange?, PartRange?> {
+        val range = this[property]
+        return if (value !in range) {
+            if (value < range.first) Pair(null, this) else Pair(this, null)
+        } else {
+            val left = range.first..<value
+            val right = value..range.last
+            when (property) {
+                'x' -> Pair(PartRange(left, m, a, s), PartRange(right, m, a, s))
+                'm' -> Pair(PartRange(x, left, a, s), PartRange(x, right, a, s))
+                'a' -> Pair(PartRange(x, m, left, s), PartRange(x, m, right, s))
+                's' -> Pair(PartRange(x, m, a, left), PartRange(x, m, a, right))
+                else -> error("Unknown property $property")
+            }
+        }
+    }
 }
 
 
 data class Workflow(val name: String, val rules: List<Rule>)
 
-sealed class Rule() {
-    abstract fun eval(p: Part): RuleResult
-//    abstract fun eval(p: PartRange): Pair<Pair<PartRange, RuleResult>, Pair<PartRange, RuleResult>?>
-}
+sealed class Rule()
 
-data class LessThan(val property: Char, val value: Int, val result: RuleResult) : Rule() {
-    override fun eval(p: Part) = if (p[property] < value) result else RuleResult.Continue
-}
-
-data class GreaterThan(val property: Char, val value: Int, val result: RuleResult) : Rule() {
-    override fun eval(p: Part): RuleResult = if (p[property] > value) result else RuleResult.Continue
-}
-
-data class Forward(val result: RuleResult) : Rule() {
-    override fun eval(p: Part) = result
-}
+data class LessThan(val property: Char, val value: Int, val ifTrue: Rule) : Rule()
+data class GreaterThan(val property: Char, val value: Int, val ifTrue: Rule) : Rule()
+data class Redirect(val workflow: String) : Rule()
+data object Accept : Rule()
+data object Reject : Rule()
 
 
 fun main() {
 
-    fun parse(fileName: String): Pair<List<Workflow>, List<Part>> {
+    fun parse(fileName: String): Pair<List<Workflow>, List<PartRange>> {
         val lines = readInput(fileName)
         val (ruleLines, inputLines) = lines.indexOfFirst { it.isBlank() }
             .let { Pair(lines.take(it), lines.drop(it + 1)) }
@@ -61,19 +63,19 @@ fun main() {
                 val rules = line.substring(i + 1, line.length - 1).split(",").map { r ->
                     if (!r.contains(":")) {
                         when (r) {
-                            "A" -> Forward(RuleResult.Accept)
-                            "R" -> Forward(RuleResult.Reject)
-                            else -> Forward(RuleResult.Delegate(r))
+                            "A" -> Accept
+                            "R" -> Reject
+                            else -> Redirect(r)
                         }
                     } else {
                         val property = r[0]
                         val op = r[1]
                         val value = r.substring(2, r.indexOf(":")).toInt()
-                        val result: RuleResult = r.substring(r.indexOf(":") + 1).let {
+                        val result = r.substring(r.indexOf(":") + 1).let {
                             when (it) {
-                                "A" -> RuleResult.Accept
-                                "R" -> RuleResult.Reject
-                                else -> RuleResult.Delegate(it)
+                                "A" -> Accept
+                                "R" -> Reject
+                                else -> Redirect(it)
                             }
                         }
 
@@ -82,7 +84,6 @@ fun main() {
                             '>' -> GreaterThan(property, value, result)
                             else -> error("Unknown operator $op")
                         }
-
                     }
 
                 }
@@ -94,33 +95,72 @@ fun main() {
             it.substring(1..it.length - 2).split(",").map { l ->
                 l.substring(2..<l.length).toInt()
             }
-        }.map { Part(it[0], it[1], it[2], it[3]) }
+        }.map { PartRange(it[0]..it[0], it[1]..it[1], it[2]..it[2], it[3]..it[3]) }
 
         return Pair(workflows, inputs)
     }
 
     val (workflows, parts) = parse("Day19")
-    val start = workflows.single { it.name == "in" }
 
-    parts.map { part ->
-        var currentRuleSet = start
-        var ruleNumber = 0
-        var lastResult: RuleResult? = null
+    fun Workflow.eval(p: PartRange): List<Pair<PartRange, Rule>> {
+        val results = mutableListOf<Pair<PartRange, Rule>>()
+        var remaining: PartRange? = p
+        rules.forEach { rule ->
+            if (remaining != null) {
+                when (rule) {
+                    is LessThan -> {
+                        val (left, right) = remaining!!.split(rule.property, rule.value)
+                        if (left != null) results.add(Pair(left, rule.ifTrue))
+                        remaining = right
+                    }
 
-        while (lastResult != RuleResult.Accept && lastResult != RuleResult.Reject) {
-            lastResult = currentRuleSet.rules[ruleNumber].eval(part)
-            when (lastResult) {
-                is RuleResult.Continue -> ruleNumber++
-                is RuleResult.Delegate -> {
-                    ruleNumber = 0
-                    currentRuleSet = workflows.single { it.name == lastResult.workflow }
+                    is GreaterThan -> {
+                        val (left, right) = remaining!!.split(rule.property, rule.value + 1)
+                        if (right != null) results.add(Pair(right, rule.ifTrue))
+                        remaining = left
+                    }
+
+                    else -> {
+                        results.add(Pair(remaining!!, rule))
+                        remaining = null
+                    }
                 }
-
-                else -> {}
             }
         }
-        Pair(part, lastResult)
+        return results
+    }
 
-    }.sumOf { if (it.second == RuleResult.Accept) (it.first.x + it.first.m + it.first.a + it.first.s) else 0 }.print()
+    fun pairs(start: PartRange): List<Pair<PartRange, Rule>> {
+        var work = listOf<Pair<PartRange, Rule>>(Pair(start, Redirect("in")))
+        while (work.any { it.second is Redirect }) {
+            work = work.flatMap { pair ->
+                val (range, rule) = pair
+                when (rule) {
+                    is Redirect -> {
+                        val w = workflows.single { it.name == rule.workflow }
+                        w.eval(range)
+                    }
+
+                    Accept -> listOf(pair)
+                    Reject -> listOf(pair)
+                    else -> error("$range $rule")
+                }
+            }
+        }
+        return work
+    }
+
+
+    parts.flatMap {
+        pairs(it)
+    }.print().filter { it.second == Accept }.map { it.first }.distinct().print()
+        .sumOf { it.x.first + it.m.first + it.a.first + it.s.first }.print { "Part 1: $it" }
+
+    val startRange = PartRange(1..4000, 1..4000, 1..4000, 1..4000)
+    var work = pairs(startRange)
+    work.filter { it.second is Accept }.sumOf { (range, rule) ->
+        (range.x.length + 1).toLong() * (range.m.length + 1) * (range.a.length + 1) * (range.s.length + 1)
+    }.print { "Part 2: $it" }
+
 
 }

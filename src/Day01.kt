@@ -1,10 +1,10 @@
 fun main() {
 
     fun part1(input: List<String>) =
-        input.sumOf { line -> "${line.first { it.isDigit() }}${line.last { it.isDigit() }}".toInt() }
+        input.sumOf { l -> "${l.first { it.isDigit() }}${l.last { it.isDigit() }}".toInt() }
 
     fun part2(input: List<String>): Int {
-        return part1(input.map { line -> line.replaceAll(digits) })
+        return part1(input.map { l -> l.replaceAll(digits) })
     }
 
     // test if implementation meets criteria from the description, like:

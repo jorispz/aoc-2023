@@ -1,26 +1,13 @@
-data class Part(val x: Int, val m: Int, val a: Int, val s: Int) {
-
-    operator fun get(c: Char) = when (c) {
-        'x' -> x
-        'm' -> m
-        'a' -> a
-        's' -> s
-        else -> error("Unknown property $c")
-    }
-}
-
 data class PartRange(val x: IntRange, val m: IntRange, val a: IntRange, val s: IntRange) {
 
-    operator fun get(c: Char) = when (c) {
-        'x' -> x
-        'm' -> m
-        'a' -> a
-        's' -> s
-        else -> error("Unknown property $c")
-    }
-
     fun split(property: Char, value: Int): Pair<PartRange?, PartRange?> {
-        val range = this[property]
+        val range = when (property) {
+            'x' -> x
+            'm' -> m
+            'a' -> a
+            's' -> s
+            else -> error("Unknown property $property")
+        }
         return if (value !in range) {
             if (value < range.first) Pair(null, this) else Pair(this, null)
         } else {
@@ -37,26 +24,52 @@ data class PartRange(val x: IntRange, val m: IntRange, val a: IntRange, val s: I
     }
 }
 
+sealed class Step()
+data class LessThan(val property: Char, val value: Int, val ifTrue: Step) : Step()
+data class GreaterThan(val property: Char, val value: Int, val ifTrue: Step) : Step()
+data class Redirect(val workflow: String) : Step()
+data object Accept : Step()
+data object Reject : Step()
 
-data class Workflow(val name: String, val rules: List<Rule>)
+data class Workflow(val name: String, val steps: List<Step>) {
+    fun eval(p: PartRange): List<Pair<PartRange, Step>> {
+        val results = mutableListOf<Pair<PartRange, Step>>()
+        var remaining: PartRange? = p
+        steps.forEach { rule ->
+            if (remaining != null) {
+                when (rule) {
+                    is LessThan -> {
+                        val (left, right) = remaining!!.split(rule.property, rule.value)
+                        if (left != null) results.add(Pair(left, rule.ifTrue))
+                        remaining = right
+                    }
 
-sealed class Rule()
+                    is GreaterThan -> {
+                        val (left, right) = remaining!!.split(rule.property, rule.value + 1)
+                        if (right != null) results.add(Pair(right, rule.ifTrue))
+                        remaining = left
+                    }
 
-data class LessThan(val property: Char, val value: Int, val ifTrue: Rule) : Rule()
-data class GreaterThan(val property: Char, val value: Int, val ifTrue: Rule) : Rule()
-data class Redirect(val workflow: String) : Rule()
-data object Accept : Rule()
-data object Reject : Rule()
+                    else -> {
+                        results.add(Pair(remaining!!, rule))
+                        remaining = null
+                    }
+                }
+            }
+        }
+        return results
+    }
+}
 
 
 fun main() {
 
     fun parse(fileName: String): Pair<List<Workflow>, List<PartRange>> {
         val lines = readInput(fileName)
-        val (ruleLines, inputLines) = lines.indexOfFirst { it.isBlank() }
+        val (workflowLines, inputLines) = lines.indexOfFirst { it.isBlank() }
             .let { Pair(lines.take(it), lines.drop(it + 1)) }
 
-        val workflows = ruleLines.map { line ->
+        val workflows = workflowLines.map { line ->
             line.indexOfFirst { it == '{' }.let { i ->
                 val name = line.substring(0, i)
 
@@ -102,36 +115,8 @@ fun main() {
 
     val (workflows, parts) = parse("Day19")
 
-    fun Workflow.eval(p: PartRange): List<Pair<PartRange, Rule>> {
-        val results = mutableListOf<Pair<PartRange, Rule>>()
-        var remaining: PartRange? = p
-        rules.forEach { rule ->
-            if (remaining != null) {
-                when (rule) {
-                    is LessThan -> {
-                        val (left, right) = remaining!!.split(rule.property, rule.value)
-                        if (left != null) results.add(Pair(left, rule.ifTrue))
-                        remaining = right
-                    }
-
-                    is GreaterThan -> {
-                        val (left, right) = remaining!!.split(rule.property, rule.value + 1)
-                        if (right != null) results.add(Pair(right, rule.ifTrue))
-                        remaining = left
-                    }
-
-                    else -> {
-                        results.add(Pair(remaining!!, rule))
-                        remaining = null
-                    }
-                }
-            }
-        }
-        return results
-    }
-
-    fun pairs(start: PartRange): List<Pair<PartRange, Rule>> {
-        var work = listOf<Pair<PartRange, Rule>>(Pair(start, Redirect("in")))
+    fun solve(start: PartRange): List<Pair<PartRange, Step>> {
+        var work = listOf<Pair<PartRange, Step>>(Pair(start, Redirect("in")))
         while (work.any { it.second is Redirect }) {
             work = work.flatMap { pair ->
                 val (range, rule) = pair
@@ -140,7 +125,6 @@ fun main() {
                         val w = workflows.single { it.name == rule.workflow }
                         w.eval(range)
                     }
-
                     Accept -> listOf(pair)
                     Reject -> listOf(pair)
                     else -> error("$range $rule")
@@ -151,16 +135,14 @@ fun main() {
     }
 
 
-    parts.flatMap {
-        pairs(it)
-    }.print().filter { it.second == Accept }.map { it.first }.distinct().print()
-        .sumOf { it.x.first + it.m.first + it.a.first + it.s.first }.print { "Part 1: $it" }
+    parts.flatMap { solve(it) }.filter { it.second == Accept }
+        .sumOf { (pr, _) -> pr.x.first + pr.m.first + pr.a.first + pr.s.first }
+        .print { "Part 1: $it" }
 
-    val startRange = PartRange(1..4000, 1..4000, 1..4000, 1..4000)
-    var work = pairs(startRange)
-    work.filter { it.second is Accept }.sumOf { (range, rule) ->
-        (range.x.length + 1).toLong() * (range.m.length + 1) * (range.a.length + 1) * (range.s.length + 1)
-    }.print { "Part 2: $it" }
+    solve(PartRange(1..4000, 1..4000, 1..4000, 1..4000)).filter { it.second is Accept }
+        .sumOf { (pr, _) ->
+            (pr.x.length + 1).toLong() * (pr.m.length + 1) * (pr.a.length + 1) * (pr.s.length + 1)
+        }.print { "Part 2: $it" }
 
 
 }
